@@ -175,7 +175,7 @@ async def today_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Отправляем гифки, если они есть
     for idx, url in enumerate(data['gifs'], start=1):
         try:
-            await update.message.send_document(documentn=url, caption=f"Упражнение {idx}")
+            await update.message.reply_animation(animation=url, caption=f"Упражнение {idx}")
         except Exception as e:
             await update.message.reply_text(f"❌ Ошибка {e}")
 
