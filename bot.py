@@ -93,7 +93,7 @@ def get_training_data(day_number):
     text = TEXTS.get(str(day_number), "📅 День отдыха или итогов.")
     return {"text": text, "gifs": []}
 
-VALID_PROMOS = ["FITNESS2025", "START10"]
+VALID_PROMOS = ["SHUSHA2301", "START10"]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
