@@ -21,13 +21,17 @@ def init_db():
             subscribe_start DATE,
             day_count INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 1,
-            promo_used INTEGER DEFAULT 0
+            promo_used INTEGER DEFAULT 0,
+            last_training_date DATE
         )
     ''')
+    # Добавляем новые столбцы, если их нет
     cur.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in cur.fetchall()]
     if 'promo_used' not in columns:
         cur.execute("ALTER TABLE users ADD COLUMN promo_used INTEGER DEFAULT 0")
+    if 'last_training_date' not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN last_training_date DATE")
     conn.commit()
     conn.close()
 
@@ -43,14 +47,17 @@ def add_user(user_id):
     conn = sqlite3.connect('fitness_bot.db')
     cur = conn.cursor()
     today = datetime.now().strftime('%Y-%m-%d')
-    cur.execute("INSERT OR IGNORE INTO users (user_id, subscribe_start) VALUES (?, ?)", (user_id, today))
+    cur.execute("INSERT OR IGNORE INTO users (user_id, subscribe_start, last_training_date) VALUES (?, ?, ?)", 
+                (user_id, today, None))
     conn.commit()
     conn.close()
 
-def update_day_count(user_id):
+def update_day_count(user_id, new_day):
     conn = sqlite3.connect('fitness_bot.db')
     cur = conn.cursor()
-    cur.execute("UPDATE users SET day_count = day_count + 1 WHERE user_id = ?", (user_id,))
+    today = datetime.now().strftime('%Y-%m-%d')
+    cur.execute("UPDATE users SET day_count = ?, last_training_date = ? WHERE user_id = ?", 
+                (new_day, today, user_id))
     conn.commit()
     conn.close()
 
@@ -65,6 +72,7 @@ def has_access(user_id):
     user = get_user(user_id)
     return user is not None and user[4] == 1
 
+# Тексты тренировок (те же)
 TEXTS = {
     "1": " 🔄 День 1: Круговая 30 мин",
     "2": "🔄 День 2: Круговая 35 мин",
@@ -93,7 +101,7 @@ def get_training_data(day_number):
     text = TEXTS.get(str(day_number), "📅 День отдыха или итогов.")
     return {"text": text, "gifs": []}
 
-VALID_PROMOS = ["SHUSHA2301", "START10"]
+VALID_PROMOS = ["SHUSHA2301", "START681"]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -125,7 +133,7 @@ async def today_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Доступ запрещён. Введите промокод через /promo.")
         return
     user = get_user(user_id)
-    day = user[2] + 1
+    day = user[2] + 1  # day_count хранит номер ПОСЛЕДНЕЙ выполненной тренировки, поэтому +1
     if day > 21:
         keyboard = [[InlineKeyboardButton("✅ Начать новый цикл", callback_data='renew')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -137,7 +145,7 @@ async def today_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_training_data(day)
     text = f"📅 Тренировка дня {day}:\n{data['text']}"
     await update.message.reply_text(text)
-    update_day_count(user_id)
+    # НЕ увеличиваем day_count здесь!
 
 async def renew_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -146,7 +154,8 @@ async def renew_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = sqlite3.connect('fitness_bot.db')
     cur = conn.cursor()
     today = datetime.now().strftime('%Y-%m-%d')
-    cur.execute("UPDATE users SET subscribe_start = ?, day_count = 0 WHERE user_id = ?", (today, user_id))
+    cur.execute("UPDATE users SET subscribe_start = ?, day_count = 0, last_training_date = ? WHERE user_id = ?", 
+                (today, None, user_id))
     conn.commit()
     conn.close()
     await query.edit_message_text("✅ Новый цикл начался! Завтра первая тренировка.")
@@ -164,11 +173,8 @@ async def scheduled_job(context: ContextTypes.DEFAULT_TYPE):
             text = f"🏋️ Тренировка дня {day}:\n{data['text']}"
             try:
                 await context.bot.send_message(chat_id=user_id, text=text)
-                conn = sqlite3.connect('fitness_bot.db')
-                cur = conn.cursor()
-                cur.execute("UPDATE users SET day_count = ? WHERE user_id = ?", (day, user_id))
-                conn.commit()
-                conn.close()
+                # Увеличиваем day_count и запоминаем дату
+                update_day_count(user_id, day)
             except Exception as e:
                 logging.error(f"Ошибка отправки {user_id}: {e}")
         else:
