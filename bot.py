@@ -25,7 +25,6 @@ def init_db():
             last_training_date DATE
         )
     ''')
-    # Добавляем новые столбцы, если их нет
     cur.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in cur.fetchall()]
     if 'promo_used' not in columns:
@@ -72,37 +71,65 @@ def has_access(user_id):
     user = get_user(user_id)
     return user is not None and user[4] == 1
 
-# Тексты тренировок (те же)
+# ====================================================
+#   НОВЫЕ ТЕКСТЫ ТРЕНИРОВОК (по вашему списку)
+# ====================================================
 TEXTS = {
-    "1": " 🔄 День 1: Круговая 30 мин",
+    "1": "🔄 День 1: Круговая 30 мин",
     "2": "🔄 День 2: Круговая 35 мин",
     "3": "🎯 День 3: 8 по 50",
     "4": "🧘 День 4: ОТДЫХ",
     "5": "💪 День 5: Блоковая 30 мин",
-    "6": "🔄 День 6:  Круговая 30 мин",
+    "6": "🔄 День 6: Круговая 30 мин",
     "7": "💪 День 7: Блоковая 30 мин",
     "8": "🧘 День 8: ОТДЫХ",
-    "9": "🔺 День 9: Пирамида 20 мин ",
+    "9": "🔺 День 9: Пирамида 20 мин",
     "10": "💪 День 10: Блоковая 35 мин",
     "11": "🔺 День 11: Пирамида 25 мин",
     "12": "🧘 День 12: ОТДЫХ",
     "13": "🔺 День 13: Пирамида 20 мин",
     "14": "💪 День 14: Блоковая 35 мин",
     "15": "🔺 День 15: Пирамида 30 мин",
-    "16": "🧘 День 16: ОТДЫХ ",
-    "17": "💪День 17: Блоковая 30 мин",
+    "16": "🧘 День 16: ОТДЫХ",
+    "17": "💪 День 17: Блоковая 30 мин",
     "18": "💪 День 18: Блоковая 35 мин",
     "19": "💪 День 19: Блоковая 40 мин",
-    "20": "🧘 День 20: ОТДЫХ ",
+    "20": "🧘 День 20: ОТДЫХ",
     "21": "🎯 День 21: 8 по 50 + Результаты"
 }
 
+# ====================================================
+#   ГИФКИ (пока только для ДНЯ 1)
+# ====================================================
+# Укажите количество гифок для каждого дня.
+# Для дней без гифок ставьте 0 или просто не указывайте.
+GIFS_PER_DAY = {
+    1: 8,   # Например, 3 упражнения в круговой тренировке дня 1
+    # 2: 0,
+    # 3: 0,
+    # ... остальные дни пока без гифок
+}
+
+# БАЗОВЫЙ URL ДЛЯ ГИФОК (ЗАМЕНИТЕ НА СВОЙ!)
+# Пример: https://raw.githubusercontent.com/ваш_логин/fitness-bot/main/
+GIF_BASE_URL = "https://raw.githubusercontent.com/egorushka681/fitness-bot/main/"
+
 def get_training_data(day_number):
     text = TEXTS.get(str(day_number), "📅 День отдыха или итогов.")
-    return {"text": text, "gifs": []}
+    count = GIFS_PER_DAY.get(day_number, 0)
+    gifs = []
+    for i in range(1, count + 1):
+        gifs.append(f"{GIF_BASE_URL}day{day_number}_{i}.gif")
+    return {"text": text, "gifs": gifs}
 
+# ====================================================
+#   ПРОМОКОДЫ (обновлены)
+# ====================================================
 VALID_PROMOS = ["SHUSHA2301", "START681"]
 
+# ====================================================
+#   КОМАНДЫ БОТА
+# ====================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     add_user(user_id)
@@ -133,7 +160,7 @@ async def today_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Доступ запрещён. Введите промокод через /promo.")
         return
     user = get_user(user_id)
-    day = user[2] + 1  # day_count хранит номер ПОСЛЕДНЕЙ выполненной тренировки, поэтому +1
+    day = user[2] + 1
     if day > 21:
         keyboard = [[InlineKeyboardButton("✅ Начать новый цикл", callback_data='renew')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -145,7 +172,12 @@ async def today_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_training_data(day)
     text = f"📅 Тренировка дня {day}:\n{data['text']}"
     await update.message.reply_text(text)
-    # НЕ увеличиваем day_count здесь!
+    # Отправляем гифки, если они есть
+    for idx, url in enumerate(data['gifs'], start=1):
+        try:
+            await update.message.reply_animation(animation=url, caption=f"Упражнение {idx}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Не удалось загрузить упражнение {idx}")
 
 async def renew_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -173,7 +205,8 @@ async def scheduled_job(context: ContextTypes.DEFAULT_TYPE):
             text = f"🏋️ Тренировка дня {day}:\n{data['text']}"
             try:
                 await context.bot.send_message(chat_id=user_id, text=text)
-                # Увеличиваем day_count и запоминаем дату
+                for idx, url in enumerate(data['gifs'], start=1):
+                    await context.bot.send_animation(chat_id=user_id, animation=url, caption=f"Упражнение {idx}")
                 update_day_count(user_id, day)
             except Exception as e:
                 logging.error(f"Ошибка отправки {user_id}: {e}")
