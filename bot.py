@@ -84,9 +84,9 @@ def load_texts():
 TEXTS = load_texts()
 
 # --- 3.2 Количество гифок по дням (укажите ваши цифры) ---
-GIFS_PER_DAY = {
-    1: 8, 2: 8, 3: 8, 4: 0, 5: 12, 6: 8, 7: 12, 8: 0,
-    9: 6 , 10: 12, 11: 7, 12: 0, 13: 6, 14: 12, 15: 7, 16: 0, 17: 12, 18: 12, 19: 12, 20: 0, 21: 8 
+# GIFS_PER_DAY = {
+#    1: 8, 2: 8, 3: 8, 4: 0, 5: 12, 6: 8, 7: 12, 8: 0,
+#    9: 6 , 10: 12, 11: 7, 12: 0, 13: 6, 14: 12, 15: 7, 16: 0, 17: 12, 18: 12, 19: 12, 20: 0, 21: 8 
 }
 
 # --- 3.3 Базовый URL для гифок (ЗАМЕНИТЕ НА СВОЙ!) ---
@@ -96,11 +96,11 @@ GIF_BASE_URL = "https://raw.githubusercontent.com/ВАШ_ЛОГИН/НАЗВАН
 
 def get_training_data(day_number):
     text = TEXTS.get(str(day_number), "📅 День отдыха.")
-    count = GIFS_PER_DAY.get(day_number, 0)
-    gifs = []
-    for i in range(1, count + 1):
-        gifs.append(f"{GIF_BASE_URL}day{day_number}_{i}.gif")
-    return {"text": text, "gifs": gifs}
+   # count = GIFS_PER_DAY.get(day_number, 0)
+   # gifs = []
+    # for i in range(1, count + 1):
+       # gifs.append(f"{GIF_BASE_URL}day{day_number}_{i}.gif")
+    return {"text": text, "gifs": []}
 
 # ========== 4. ВАЛИДНЫЕ ПРОМОКОДЫ ==========
 VALID_PROMOS = ["SHUSHA2301", "START681"]  # Добавьте свои
@@ -151,13 +151,13 @@ async def today_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     data = get_training_data(day)
     text = f"📅 Тренировка дня {day}:\n{data['text']}"
-    gifs = data['gifs']
+   # gifs = data['gifs']
     await update.message.reply_text(text)
-    for idx, url in enumerate(gifs, start=1):
-        try:
-            await update.message.reply_animation(animation=url, caption=f"Упражнение {idx}")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Не удалось загрузить упражнение {idx}: {e}")
+   # for idx, url in enumerate(gifs, start=1):
+        # try:
+       #     await update.message.reply_animation(animation=url, caption=f"Упражнение {idx}")
+      #  except Exception as e:
+        #   await update.message.reply_text(f"❌ Не удалось загрузить упражнение {idx}: {e}")
     update_day_count(user_id)
 
 async def renew_cycle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,11 +184,11 @@ async def scheduled_job(context: ContextTypes.DEFAULT_TYPE):
         if day <= 21:
             data = get_training_data(day)
             text = f"🏋️ Тренировка дня {day}:\n{data['text']}"
-            gifs = data['gifs']
+           # gifs = data['gifs']
             try:
                 await context.bot.send_message(chat_id=user_id, text=text)
-                for idx, url in enumerate(gifs, start=1):
-                    await context.bot.send_animation(chat_id=user_id, animation=url, caption=f"Упражнение {idx}")
+               # for idx, url in enumerate(gifs, start=1):
+               #     await context.bot.send_animation(chat_id=user_id, animation=url, caption=f"Упражнение {idx}")
                 conn = sqlite3.connect('fitness_bot.db')
                 cur = conn.cursor()
                 cur.execute("UPDATE users SET day_count = ? WHERE user_id = ?", (day, user_id))
